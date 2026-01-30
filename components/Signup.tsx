@@ -1,19 +1,35 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { UserPlus, User, Lock, Mail, ArrowRight } from 'lucide-react';
+import { useNavigate, Link } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
 
-interface SignupProps {
-  onSignup: (name: string, email: string) => void;
-  onNavigateToLogin: () => void;
-}
-
-const Signup: React.FC<SignupProps> = ({ onSignup, onNavigateToLogin }) => {
+const Signup: React.FC = () => {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
+  const { signup, isAuthenticated, loading: authLoading } = useAuth();
+  const navigate = useNavigate();
 
-  const handleSubmit = (e: React.FormEvent) => {
+  // Redirect if already authenticated
+  useEffect(() => {
+    if (!authLoading && isAuthenticated) {
+      navigate('/', { replace: true });
+    }
+  }, [isAuthenticated, authLoading, navigate]);
+
+  // Show loading while checking auth state
+  if (authLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-[80vh]">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-emerald-600"></div>
+      </div>
+    );
+  }
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!name || !email || !password || !confirmPassword) {
       setError('Please fill in all fields');
@@ -23,7 +39,33 @@ const Signup: React.FC<SignupProps> = ({ onSignup, onNavigateToLogin }) => {
       setError('Passwords do not match');
       return;
     }
-    onSignup(name, email);
+    if (password.length < 6) {
+      setError('Password must be at least 6 characters');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      await signup(email, password, { name });
+      navigate('/');
+    } catch (err: any) {
+      console.error('Signup error:', err);
+      switch (err.code) {
+        case 'auth/email-already-in-use':
+          setError('Email is already registered');
+          break;
+        case 'auth/invalid-email':
+          setError('Invalid email address');
+          break;
+        case 'auth/weak-password':
+          setError('Password is too weak');
+          break;
+        default:
+          setError('Failed to create account. Please try again.');
+      }
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -56,6 +98,7 @@ const Signup: React.FC<SignupProps> = ({ onSignup, onNavigateToLogin }) => {
                 onChange={(e) => setName(e.target.value)}
                 className="block w-full pl-10 pr-3 py-2 border border-slate-300 rounded-lg focus:ring-emerald-500 focus:border-emerald-500 outline-none transition-all"
                 placeholder="John Doe"
+                disabled={loading}
               />
             </div>
           </div>
@@ -72,6 +115,7 @@ const Signup: React.FC<SignupProps> = ({ onSignup, onNavigateToLogin }) => {
                 onChange={(e) => setEmail(e.target.value)}
                 className="block w-full pl-10 pr-3 py-2 border border-slate-300 rounded-lg focus:ring-emerald-500 focus:border-emerald-500 outline-none transition-all"
                 placeholder="teacher@school.edu"
+                disabled={loading}
               />
             </div>
           </div>
@@ -88,6 +132,7 @@ const Signup: React.FC<SignupProps> = ({ onSignup, onNavigateToLogin }) => {
                 onChange={(e) => setPassword(e.target.value)}
                 className="block w-full pl-10 pr-3 py-2 border border-slate-300 rounded-lg focus:ring-emerald-500 focus:border-emerald-500 outline-none transition-all"
                 placeholder="••••••••"
+                disabled={loading}
               />
             </div>
           </div>
@@ -104,26 +149,27 @@ const Signup: React.FC<SignupProps> = ({ onSignup, onNavigateToLogin }) => {
                 onChange={(e) => setConfirmPassword(e.target.value)}
                 className="block w-full pl-10 pr-3 py-2 border border-slate-300 rounded-lg focus:ring-emerald-500 focus:border-emerald-500 outline-none transition-all"
                 placeholder="••••••••"
+                disabled={loading}
               />
             </div>
           </div>
 
           <button
             type="submit"
-            className="w-full flex items-center justify-center gap-2 bg-emerald-600 text-white font-semibold py-3 px-4 rounded-lg hover:bg-emerald-700 transition-colors shadow-md"
+            disabled={loading}
+            className="w-full flex items-center justify-center gap-2 bg-emerald-600 text-white font-semibold py-3 px-4 rounded-lg hover:bg-emerald-700 transition-colors shadow-md disabled:bg-emerald-400 disabled:cursor-not-allowed"
           >
-            Create Account <ArrowRight className="w-4 h-4" />
+            {loading ? 'Creating Account...' : <>Create Account <ArrowRight className="w-4 h-4" /></>}
           </button>
 
           <div className="text-center text-sm text-slate-600 mt-4">
             Already have an account?{' '}
-            <button
-              type="button"
-              onClick={onNavigateToLogin}
+            <Link
+              to="/login"
               className="text-emerald-600 font-semibold hover:underline"
             >
               Log in
-            </button>
+            </Link>
           </div>
         </form>
       </div>

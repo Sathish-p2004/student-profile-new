@@ -1,24 +1,67 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { LayoutDashboard, Lock, Mail, ArrowRight } from 'lucide-react';
+import { useNavigate, Link } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
 
-interface LoginProps {
-  onLogin: (email: string) => void;
-  onNavigateToSignup: () => void;
-}
-
-const Login: React.FC<LoginProps> = ({ onLogin, onNavigateToSignup }) => {
+const Login: React.FC = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
+  const { login, isAuthenticated, loading: authLoading } = useAuth();
+  const navigate = useNavigate();
 
-  const handleSubmit = (e: React.FormEvent) => {
+  // Redirect if already authenticated
+  useEffect(() => {
+    if (!authLoading && isAuthenticated) {
+      navigate('/', { replace: true });
+    }
+  }, [isAuthenticated, authLoading, navigate]);
+
+  // Show loading while checking auth state
+  if (authLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-[80vh]">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+      </div>
+    );
+  }
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setError('');
+
     if (!email || !password) {
       setError('Please fill in all fields');
       return;
     }
-    // Simulate login delay
-    onLogin(email);
+
+    setLoading(true);
+    try {
+      await login(email, password);
+      navigate('/');
+    } catch (err: any) {
+      console.error('Login error:', err);
+      switch (err.code) {
+        case 'auth/user-not-found':
+        case 'auth/invalid-credential':
+          setError('Invalid email or password');
+          break;
+        case 'auth/wrong-password':
+          setError('Incorrect password');
+          break;
+        case 'auth/invalid-email':
+          setError('Invalid email address');
+          break;
+        case 'auth/too-many-requests':
+          setError('Too many attempts. Please try again later.');
+          break;
+        default:
+          setError('Failed to log in. Please try again.');
+      }
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -51,6 +94,7 @@ const Login: React.FC<LoginProps> = ({ onLogin, onNavigateToSignup }) => {
                 onChange={(e) => setEmail(e.target.value)}
                 className="block w-full pl-10 pr-3 py-2 border border-slate-300 rounded-lg focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
                 placeholder="teacher@school.edu"
+                disabled={loading}
               />
             </div>
           </div>
@@ -67,26 +111,27 @@ const Login: React.FC<LoginProps> = ({ onLogin, onNavigateToSignup }) => {
                 onChange={(e) => setPassword(e.target.value)}
                 className="block w-full pl-10 pr-3 py-2 border border-slate-300 rounded-lg focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
                 placeholder="••••••••"
+                disabled={loading}
               />
             </div>
           </div>
 
           <button
             type="submit"
-            className="w-full flex items-center justify-center gap-2 bg-blue-600 text-white font-semibold py-3 px-4 rounded-lg hover:bg-blue-700 transition-colors shadow-md"
+            disabled={loading}
+            className="w-full flex items-center justify-center gap-2 bg-blue-600 text-white font-semibold py-3 px-4 rounded-lg hover:bg-blue-700 transition-colors shadow-md disabled:bg-blue-400 disabled:cursor-not-allowed"
           >
-            Sign In <ArrowRight className="w-4 h-4" />
+            {loading ? 'Signing in...' : <>Sign In <ArrowRight className="w-4 h-4" /></>}
           </button>
 
           <div className="text-center text-sm text-slate-600 mt-4">
             Don't have an account?{' '}
-            <button
-              type="button"
-              onClick={onNavigateToSignup}
+            <Link
+              to="/signup"
               className="text-blue-600 font-semibold hover:underline"
             >
               Sign up
-            </button>
+            </Link>
           </div>
         </form>
       </div>
